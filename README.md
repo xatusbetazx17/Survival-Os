@@ -193,6 +193,77 @@ The intended workflow is simple:
 
 ---
 
+## Updates, mirrors, and preloading packages
+
+RefugeOS can be used in three different ways:
+
+### 1. Installed RefugeOS
+If RefugeOS is installed to an SSD, HDD, or USB as a real Arch system, package installs and updates work normally with `pacman`.
+
+### 2. Live USB without persistence
+If RefugeOS is only being used as a normal live USB, packages can still be installed during that session, but those changes are temporary and should not be expected to survive a reboot.
+
+### 3. Live USB with persistence
+A persistent live setup can keep changes across reboots. RefugeOS is still built with `archiso`, so future persistence workflows can be based on Archiso persistence parameters such as `cow_label`, `cow_device`, and `cow_directory`.
+
+### Default mirror setup
+
+A simple default mirror list is enough for most users:
+
+```bash
+sudo tee /etc/pacman.d/mirrorlist >/dev/null <<'EOF'
+Server = https://geo.mirror.pkgbuild.com/$repo/os/$arch
+EOF
+```
+
+Then refresh and update:
+
+```bash
+sudo pacman -Syyu
+```
+
+To install more packages later:
+
+```bash
+sudo pacman -S firefox libreoffice-still mpv kiwix-desktop xiphos
+```
+
+### Optional automatic mirror refresh
+
+If you want a better local mirror list, install `reflector` and let it refresh `/etc/pacman.d/mirrorlist` automatically:
+
+```bash
+sudo pacman -S reflector
+sudo reflector --latest 20 --protocol https --sort rate --save /etc/pacman.d/mirrorlist
+sudo systemctl enable --now reflector.timer
+```
+
+### Pre-downloading packages before hard times
+
+You can prepare ahead of time by downloading packages now without installing them yet:
+
+```bash
+sudo mkdir -p /srv/refuge-cache
+sudo pacman -Sw --cachedir /srv/refuge-cache \
+  firefox libreoffice-still mpv kiwix-desktop xiphos \
+  gparted qmapshack marble newsboat
+```
+
+Later, you can tell `pacman` to reuse that cache by adding another cache directory under `[options]` in `/etc/pacman.conf`:
+
+```ini
+CacheDir = /var/cache/pacman/pkg
+CacheDir = /srv/refuge-cache
+```
+
+That lets you stockpile useful packages ahead of time on an internal drive, SSD, or large USB device.
+
+### Recommendation
+
+For this project, the safest default is to rely mostly on the official Arch repositories and keep the base system simple and reproducible. If a user wants more tools before things become worse, they can update the mirror list, refresh the databases, and pre-download packages now while the network is still available.
+
+---
+
 ## Virtual machine use
 
 RefugeOS can be tested in VirtualBox or QEMU before writing it to USB.
