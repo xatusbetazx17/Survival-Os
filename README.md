@@ -12,12 +12,12 @@ It is designed to be carried on a USB drive, booted as a live system, installed 
 
 RefugeOS was built around a few practical needs:
 
-- a **portable live system** that can boot on modern x86_64 hardware
-- a **very lightweight base** that can scale from a smaller `lite` build to a fuller `full` build
-- a **Bible and offline-reference layer** that still works with no connection
-- a **normal desktop workflow** with browser, documents, notes, media, and file tools
-- an **Arch-native build system** that is easier to maintain on Arch and SteamOS-style environments
-- optional **security and recovery modules** that can be included only when they are actually needed
+- a portable live system that can boot on modern x86_64 hardware
+- a very lightweight base that can scale from a smaller `lite` build to a fuller `full` build
+- a Bible and offline-reference layer that still works with no connection
+- a normal desktop workflow with browser, documents, notes, media, and file tools
+- an Arch-native build system that is easier to maintain on Arch and SteamOS-style environments
+- optional security and recovery modules that can be included only when they are actually needed
 
 This repository contains the **source tree for building the ISO**, not just a wallpapered Linux remaster. It is meant to be practical, rebuildable, and understandable.
 
@@ -149,8 +149,8 @@ out/
 
 This builder defaults to:
 
-- **BIOS boot**
-- **x86_64 UEFI boot**
+- BIOS boot
+- x86_64 UEFI boot
 
 IA32 UEFI is disabled by default because it causes unnecessary host-side GRUB problems on most modern systems.
 
@@ -193,6 +193,94 @@ The intended workflow is simple:
 
 ---
 
+## Automatic install from the USB
+
+RefugeOS can be installed from the live USB without rebuilding the ISO.
+
+The current recommended installer is the **standalone automatic installer**. The idea is simple:
+
+1. boot the RefugeOS USB
+2. connect to the internet if available
+3. open the folder that contains the automatic installer package
+4. extract it
+5. run the installer script
+6. let it wipe the selected target disk, partition it, install Arch + RefugeOS packages, and copy the RefugeOS custom files into the installed system
+
+### What the automatic installer does
+
+The standalone installer is designed to do the heavy work for the user:
+
+- repairs the live pacman keyring
+- writes a working pacman mirror configuration
+- lets the user choose the target disk
+- lets the user choose **ext4** or **btrfs**
+- wipes the selected disk completely
+- creates and mounts the needed partitions automatically
+- runs unattended `archinstall`
+- installs the RefugeOS package set from the live system/package manifest
+- copies RefugeOS files, launchers, and defaults into the installed system
+- enables `sudo`, NetworkManager, time sync, and earlyoom
+- can optionally enable `multilib`, `Chaotic-AUR`, and an AUR helper
+
+### Simple install steps
+
+If the automatic installer ZIP is already on the USB or copied into `Downloads`, the user only needs to extract it and run the script:
+
+```bash
+cd ~/Downloads
+unzip refugeos-auto-installer-v7.zip
+cd refugeos-auto-installer-v7
+chmod +x install-refugeos-auto-standalone-v7.sh
+sudo ./install-refugeos-auto-standalone-v7.sh
+```
+
+### Nearly unattended install
+
+For a mostly hands-off install, edit the config file before running the script:
+
+```bash
+cd ~/Downloads/refugeos-auto-installer-v7
+cp refugeos-install.conf.example refugeos-install.conf
+nano refugeos-install.conf
+```
+
+Typical settings:
+
+```bash
+REFUGE_UI=0
+REFUGE_FORCE_YES=1
+REFUGE_TARGET_DISK="/dev/sda"
+REFUGE_FILESYSTEM="ext4"
+REFUGE_USERNAME="refuge"
+REFUGE_PASSWORD="change-this-password"
+REFUGE_ROOT_PASSWORD="change-this-password-too"
+REFUGE_ENABLE_MULTILIB=1
+REFUGE_ENABLE_CHAOTIC=1
+REFUGE_ENABLE_AUR_HELPER=1
+REFUGE_AUTOLOGIN=1
+```
+
+Then run:
+
+```bash
+sudo ./install-refugeos-auto-standalone-v7.sh
+```
+
+### Important warning
+
+This installer is destructive. It will erase the disk you select.
+
+Double-check the target disk before continuing.
+
+### Filesystem recommendation
+
+- **ext4**: safer default, simple, widely compatible, good general-purpose choice
+- **btrfs**: useful if you want copy-on-write features, snapshots, and compression
+
+For most people, **ext4** is the best default.
+
+---
+
 ## Updates, mirrors, and preloading packages
 
 RefugeOS can be used in three different ways:
@@ -207,13 +295,10 @@ If RefugeOS is only being used as a normal live USB, packages can still be insta
 A persistent live setup can keep changes across reboots. RefugeOS is still built with `archiso`, so future persistence workflows can be based on Archiso persistence parameters such as `cow_label`, `cow_device`, and `cow_directory`.
 
 ### Default mirror setup
-
-A simple default mirror list is enough for most users:
+A simple safe mirror line is enough for most users:
 
 ```bash
-sudo tee /etc/pacman.d/mirrorlist >/dev/null <<'EOF'
-Server = https://geo.mirror.pkgbuild.com/$repo/os/$arch
-EOF
+printf '%s\n' 'Server = https://geo.mirror.pkgbuild.com/$repo/os/$arch' | sudo tee /etc/pacman.d/mirrorlist >/dev/null
 ```
 
 Then refresh and update:
@@ -229,7 +314,6 @@ sudo pacman -S firefox libreoffice-still mpv kiwix-desktop xiphos
 ```
 
 ### Optional automatic mirror refresh
-
 If you want a better local mirror list, install `reflector` and let it refresh `/etc/pacman.d/mirrorlist` automatically:
 
 ```bash
@@ -239,7 +323,6 @@ sudo systemctl enable --now reflector.timer
 ```
 
 ### Pre-downloading packages before hard times
-
 You can prepare ahead of time by downloading packages now without installing them yet:
 
 ```bash
@@ -249,7 +332,7 @@ sudo pacman -Sw --cachedir /srv/refuge-cache \
   gparted qmapshack marble newsboat
 ```
 
-Later, you can tell `pacman` to reuse that cache by adding another cache directory under `[options]` in `/etc/pacman.conf`:
+Later, tell pacman to reuse that cache by adding another cache directory under `[options]` in `/etc/pacman.conf`:
 
 ```ini
 CacheDir = /var/cache/pacman/pkg
@@ -259,8 +342,7 @@ CacheDir = /srv/refuge-cache
 That lets you stockpile useful packages ahead of time on an internal drive, SSD, or large USB device.
 
 ### Recommendation
-
-For this project, the safest default is to rely mostly on the official Arch repositories and keep the base system simple and reproducible. If a user wants more tools before things become worse, they can update the mirror list, refresh the databases, and pre-download packages now while the network is still available.
+For this project, the safest default is to rely mostly on the official Arch repositories and keep the base system simple and reproducible. If a user wants more tools before things become worse, they can update the mirror list, refresh the databases, and pre-download packages while the network is still available.
 
 ---
 
@@ -271,12 +353,12 @@ RefugeOS can be tested in VirtualBox or QEMU before writing it to USB.
 For VirtualBox, the safest first test is:
 
 - Linux guest
-- **VMSVGA** graphics controller
-- **3D acceleration off** for the first boot
-- **128 MB** video memory
-- at least **2–4 GB RAM** for `full`
+- VMSVGA graphics controller
+- 3D acceleration off for the first boot
+- 128 MB video memory
+- at least 2–4 GB RAM for `full`
 
-If the VM shows only a black background **but the panel, tray, clock, and launchers are visible**, the desktop session has usually booted and the issue is visual rather than a total boot failure.
+If the VM shows only a black background but the panel, tray, clock, and launchers are visible, the desktop session has usually booted and the issue is visual rather than a total boot failure.
 
 For real validation, test both:
 
